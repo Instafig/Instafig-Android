@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Map;
 
 public class SPUtils {
     public static final String FILE_NAME = "instafig";
@@ -79,16 +78,6 @@ public class SPUtils {
         SharedPreferencesCompat.apply(editor);
     }
 
-    /**
-     * @param context
-     */
-    public static void clear(Context context) {
-        SharedPreferences sp = context.getSharedPreferences(FILE_NAME,
-                Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sp.edit();
-        editor.clear();
-        SharedPreferencesCompat.apply(editor);
-    }
 
     /**
      * @param context
@@ -101,15 +90,6 @@ public class SPUtils {
         return sp.contains(key);
     }
 
-    /**
-     * @param context
-     * @return
-     */
-    public static Map<String, ?> getAll(Context context) {
-        SharedPreferences sp = context.getSharedPreferences(FILE_NAME,
-                Context.MODE_PRIVATE);
-        return sp.getAll();
-    }
 
     /**
      * @author zhy

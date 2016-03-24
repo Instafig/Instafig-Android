@@ -12,107 +12,98 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Random;
 
 public class Instafig {
     public static String INSTAFIG_ACTION = "com.appwill.instafig";
 
-    public Instafig(JSONObject jsonObject) {
-        ActivityLifecycleCallbacks.init(context);
-        this.conObj = jsonObject;
-    }
+    private static String defaultPath = "beijing5.appdao.com:17070";
+
+    private static String[] allNodes = null;
+    private static int currentNodeIndex = 0;
+    private static Application context;
+    private static String appKey;
 
     static Instafig instafig = null;
+
+    private static Configuration config = null;
+
+    private static HashMap<String, String> params;
+
+    /**
+     * init instafig
+     *
+     * @param application
+     * @param curappKey
+     * @param nodePaths
+     */
+    public static void startWithAPPKEY(Application application, String curappKey, String... nodePaths) {
+        context = application;
+        appKey = curappKey;
+
+        params = setParams(context, appKey);
+        String configCache = (String) SPUtils.get(context,
+                "configCache", "");
+        if (configCache.equals("")) {
+            config = new Configuration(new JSONObject());
+            params.put("data_sign", "");
+            if (nodePaths != null && nodePaths.length != 0)
+                allNodes = nodePaths;
+            else {
+                allNodes = new String[]{defaultPath};
+            }
+        } else {
+            config = new Configuration(configCache);
+            String allNodePath = (String) SPUtils.get(context, "nodes", "");
+            params.put("data_sign", (String) SPUtils.get(context, "data_sign", ""));
+            if (allNodePath.equals(""))
+                allNodes = new String[]{defaultPath};
+            else
+                allNodes = parseStrings(allNodePath);
+        }
+    }
 
     public static Instafig getInstance() {
         if (instafig == null) {
             synchronized (Instafig.class) {
                 if (instafig == null) {
-                    HashMap<String, String> params = setParams(context, appKey);
-                    String confString = (String) SPUtils.get(context,
-                            "resultData", "");
-                    if (confString.equals("")) {
-                        params.put("data_sign", "");
-                        RequestParams req = new RequestParams(params);
-                        loadConFromInternet(context, req, defaultPath);
-                        instafig = new Instafig(new JSONObject());
-                    } else {
-                        CacheClass cacheClass = parseJSON(confString);
-                        if (cacheClass.getNodes().length != 0) {
-                            if (cacheClass.getNodes().length == 0)
-                                allPaths = new String[]{defaultPath};
-                            else
-                                allPaths = cacheClass.getNodes();
-                            SPUtils.put(context, "paths", allPaths);
-                            String path = allPaths[currentPathIndex];
-                            params.put("data_sign", cacheClass.getData_sign());
-                            RequestParams req = new RequestParams(params);
-                            loadConFromInternet(context, req, path);
-                        }
-                        instafig = cacheClass.getConfigus();
-                        if (SPUtils.contains(context, "paths"))
-                            SPUtils.remove(context, "paths");
-                        SPUtils.put(context, "paths", randomStrings(allPaths));
-                    }
+                    instafig = new Instafig();
+                    RequestParams req = new RequestParams(params);
+                    loadConFromInternet(context, req, allNodes[currentNodeIndex]);
                 }
             }
         }
         return instafig;
     }
 
-    private JSONObject conObj;
 
-    public int getInt(String key, int defaultValue) {
-        try {
-            return conObj.getInt(key);
-        } catch (Exception e) {
-            return defaultValue;
-        }
+    public Instafig() {
+        ActivityLifecycleCallbacks.init(context);
     }
-
-    public float getFloat(String key, float defaultValue) {
-        try {
-            return Float.parseFloat(conObj.getString(key));
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-//    public double getDouble(String key, double defaultValue) {
-//        try {
-//            return conObj.getDouble(key);
-//        } catch (Exception e) {
-//            return defaultValue;
-//        }
-//    }
-
-
-    public String getString(String key, String defaultValue) {
-        try {
-            return conObj.getString(key);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-
-    private static String defaultPath = "beijing5.appdao.com:17070";
-
-    private static String[] allPaths = null;
-    private static int currentPathIndex = 0;
-    private static Application context;
-    private static String appKey;
 
     /**
-     * @param application
-     * @param curappKey
+     * @return
      */
-    public static void startWithAPPKEY(Application application, String curappKey) {
-        context = application;
-        appKey = curappKey;
+    public Configuration getConfig() {
+        return config;
     }
+
+    /**
+     * get data from net
+     */
+    public void getConfigFromNet() {
+        HashMap<String, String> params = setParams(context, appKey);
+        params.put("data_sign", "");
+        RequestParams requestParams = new RequestParams(params);
+        if (allNodes != null && allNodes.length != 0) {
+            loadConFromInternet(context, requestParams, allNodes[0]);
+            allNodes = parseStrings(randomStringArray(allNodes));//random
+        } else {
+            loadConFromInternet(context, requestParams, defaultPath);
+        }
+    }
+
 
     /**
      * set params
@@ -137,61 +128,69 @@ public class Instafig {
         } catch (PackageManager.NameNotFoundException e) {
             params.put("app_version", "");
         }
-        params.put("ip", IPUtils.getLocalIpAddress(context));
         params.put("lang", context.getResources().getConfiguration().locale
                 + "");
-//        params.put("device_id", ((TelephonyManager) context
-//                .getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId());
         params.put("device_id", Build.SERIAL);
-
         return params;
     }
 
     /**
-     * load data from internet
+     * load configuration from internet
      *
      * @param context
      * @param params
      */
     private static void loadConFromInternet(final Context context,
                                             final RequestParams params, String path) {
-
-        if (SPUtils.contains(context, "lastLoadDate"))
-            SPUtils.remove(context, "lastLoadDate");
-        SPUtils.put(context, "lastLoadDate", new Date().getTime());
-
         String paramsString = params.getParams();
         path = "http://" + path + "/client/config?";
-        String endString = path + paramsString;
-        HttpUtils.getConfs(endString, new GetCallbackListener() {
+        String requestString = path + paramsString;
+        HttpUtils.getConfs(requestString, new GetCallbackListener() {
             public void onFinish(String result) {
-                if (SPUtils.contains(context, "resultData")) {
-                    SPUtils.remove(context, "resultData");
+                CacheClass cacheClass = parseJSON(result);
+                if (cacheClass != null) {
+                    SPUtils.remove(context, "nodes");
+                    SPUtils.remove(context, "data_sign");
+                    SPUtils.put(context, "nodes", randomStringArray(cacheClass.getNodes()));
+                    SPUtils.put(context, "data_sign", cacheClass.getData_sign());
+                    if (cacheClass.getConfigus() != null) {
+                        SPUtils.remove(context, "configCache");
+                        SPUtils.put(context, "configCache", cacheClass.getConfigus().toString());
+                        config = cacheClass.getConfigus();
+                    }
+                    LocalBroadcastManager lbm = LocalBroadcastManager //send broadcast when data update
+                            .getInstance(context);
+                    Intent intent = new Intent(INSTAFIG_ACTION);
+                    lbm.sendBroadcast(intent);
+                } else {
+                    requestConWhenError(context, params);
                 }
-                SPUtils.put(context, "resultData", result);
-                instafig = parseJSON(result).getConfigus();
-                LocalBroadcastManager lbm = LocalBroadcastManager
-                        .getInstance(context);
-                Intent intent = new Intent(INSTAFIG_ACTION);
-                intent.putExtra("configus", parseJSON(result).getConfigus()
-                        .toString());
-                lbm.sendBroadcast(intent);
             }
 
             public void onError(String exception) {
-                if (allPaths != null && allPaths.length != 0 && currentPathIndex != allPaths.length) {
-                    loadConFromInternet(context, params,
-                            allPaths[currentPathIndex]);
-                    currentPathIndex++;
-                }
+                requestConWhenError(context, params);
             }
         });
     }
 
     /**
+     * request data when status is false or node error
+     *
+     * @param context
+     * @param params
+     */
+    private static void requestConWhenError(Context context, RequestParams params) {
+        if (allNodes != null && allNodes.length != 0 && currentNodeIndex < allNodes.length) {
+            loadConFromInternet(context, params,
+                    allNodes[currentNodeIndex]);
+            currentNodeIndex++;
+        }
+    }
+
+    /**
      * parse json
      *
-     * @param result json
+     * @param result
      * @return
      */
     private static CacheClass parseJSON(String result) {
@@ -203,32 +202,36 @@ public class Instafig {
             if (status) {
                 JSONObject dataObj = resObj.getJSONObject("data");
                 String sign = dataObj.getString("data_sign");
-
+                try {
+                    JSONObject confsObj = dataObj.getJSONObject("configs");  //if web server don't return data_sign and configus
+                    cacheClass.setConfigus(new Configuration(confsObj));
+                } catch (Exception e) {
+                    cacheClass.setConfigus(null);
+                }
                 JSONArray nodes = dataObj.getJSONArray("nodes");
                 String[] nodesList = new String[nodes.length()];
                 for (int i = 0; i < nodes.length(); i++) {
                     nodesList[i] = (String) nodes.get(i);
                 }
-
-                JSONObject confsObj = dataObj.getJSONObject("configs");
-
-                cacheClass.setConfigus(new Instafig(confsObj));
                 cacheClass.setData_sign(sign);
                 cacheClass.setNodes(nodesList);
             } else {
-                String code = resObj.getString("code");
-                String msg = resObj.getString("msg");
-                cacheClass.setErrorCode(code);
-                cacheClass.setErrorMsg(msg);
+                return null; //if status is not true
             }
         } catch (JSONException ex) {
-            // ex.printStackTrace();
-            // Log.e("------error", "出异常了");
+            return null;
         }
         return cacheClass;
     }
 
-    private static String[] randomStrings(String[] params) {
+
+    /**
+     * random all nodePaths(StringArray) and change to String
+     *
+     * @param params
+     * @return
+     */
+    private static String randomStringArray(String[] params) {
         String[] result = new String[params.length];
         int count = params.length;
         int cbRandCount = 0;
@@ -244,6 +247,24 @@ public class Instafig {
             cbRandCount++;
             params[cbPosition] = params[r - 1];
         } while (cbRandCount < count);
+
+        StringBuilder builder = new StringBuilder();
+        for (String s : result) {
+            builder.append(s);
+            builder.append(",");
+        }
+        return builder.toString();
+    }
+
+
+    /**
+     * String to StringArray
+     *
+     * @param params
+     * @return
+     */
+    private static String[] parseStrings(String params) {
+        String[] result = params.split(",");
         return result;
     }
 

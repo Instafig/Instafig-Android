@@ -1,21 +1,22 @@
 package com.apptao.i.instafig;
 
+import android.graphics.Bitmap;
+
 /**
  * Created by miss_jie on 2016/3/4.
  */
 public class CacheClass {
-    private Instafig configus;
+
+    private Configuration configus;
     private String data_sign;
     private String[] nodes;
 
-    private String errorCode;
-    private String errorMsg;
 
-    public Instafig getConfigus() {
+    public Configuration getConfigus() {
         return configus;
     }
 
-    public void setConfigus(Instafig configus) {
+    public void setConfigus(Configuration configus) {
         this.configus = configus;
     }
 
@@ -35,19 +36,5 @@ public class CacheClass {
         return nodes;
     }
 
-    public String getErrorCode() {
-        return errorCode;
-    }
 
-    public void setErrorCode(String errorCode) {
-        this.errorCode = errorCode;
-    }
-
-    public String getErrorMsg() {
-        return errorMsg;
-    }
-
-    public void setErrorMsg(String errorMsg) {
-        this.errorMsg = errorMsg;
-    }
 }
